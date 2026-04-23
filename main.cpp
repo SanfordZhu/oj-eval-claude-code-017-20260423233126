@@ -1329,7 +1329,7 @@ int main() {
                 cout << "-1\n";
                 continue;
             }
-            Date startDate = train->saleStart;
+            Date startDate = Date::fromString(d);
             cout << train->trainID << " " << train->type << "\n";
 
             for (int j = 0; j < train->stationNum; j++) {
