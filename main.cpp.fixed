@@ -1,0 +1,920 @@
+#include <iostream>
+#include <string>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <ctime>
+#include <chrono>
+
+using namespace std;
+
+// Date and time utilities
+struct Date {
+    int month;
+    int day;
+
+    Date() : month(0), day(0) {}
+    Date(int m, int d) : month(m), day(d) {}
+
+    int compare(const Date& other) const {
+        if (month != other.month) return month - other.month;
+        return day - other.day;
+    }
+
+    int dayOfYear() const {
+        const int daysInMonth[] = {0, 31, 28, 31, 30, 31, 30, 31, 31};
+        int sum = 0;
+        for (int i = 1; i < month; i++) {
+            sum += daysInMonth[i];
+        }
+        sum += day;
+        return sum;
+    }
+
+    string toString() const {
+        char buf[6];
+        sprintf(buf, "%02d-%02d", month, day);
+        return string(buf);
+    }
+
+    static Date fromString(const string& s) {
+        int m = (s[0] - '0') * 10 + (s[1] - '0');
+        int d = (s[3] - '0') * 10 + (s[4] - '0');
+        return Date(m, d);
+    }
+
+    int daysBetween(const Date& other) const {
+        return dayOfYear() - other.dayOfYear();
+    }
+};
+
+struct Time {
+    int hour;
+    int minute;
+
+    Time() : hour(0), minute(0) {}
+    Time(int h, int m) : hour(h), minute(m) {}
+
+    int totalMinutes() const {
+        return hour * 60 + minute;
+    }
+
+    string toString() const {
+        char buf[6];
+        sprintf(buf, "%02d:%02d", hour, minute);
+        return string(buf);
+    }
+
+    static Time fromString(const string& s) {
+        int h = (s[0] - '0') * 10 + (s[1] - '0');
+        int m = (s[3] - '0') * 10 + (s[4] - '0');
+        return Time(h, m);
+    }
+};
+
+struct DateTime {
+    Date date;
+    Time time;
+
+    DateTime() {}
+    DateTime(Date d, Time t) : date(d), time(t) {}
+
+    int totalMinutes() const {
+        return date.dayOfYear() * 1440 + time.totalMinutes();
+    }
+
+    string dateString() const {
+        return date.toString();
+    }
+
+    string timeString() const {
+        return time.toString();
+    }
+};
+
+// Hash table node template
+template<typename T>
+struct HashNode {
+    string key;
+    T value;
+    HashNode* next;
+    HashNode(const string& k, const T& v) : key(k), value(v), next(nullptr) {}
+};
+
+// Simple hash function for strings
+unsigned int hashString(const string& s) {
+    unsigned int hash = 5381;
+    for (size_t i = 0; i < s.size(); i++) {
+        hash = ((hash << 5) + hash) + s[i];
+    }
+    return hash;
+}
+
+// Hash table implementation
+template<typename T>
+class HashTable {
+private:
+    HashNode<T>** table;
+    int capacity;
+    int size;
+
+public:
+    HashTable(int cap = 1024) : capacity(cap), size(0) {
+        table = new HashNode<T>*[capacity];
+        for (int i = 0; i < capacity; i++) {
+            table[i] = nullptr;
+        }
+    }
+
+    ~HashTable() {
+        clear();
+        delete[] table;
+    }
+
+    void clear() {
+        for (int i = 0; i < capacity; i++) {
+            HashNode<T>* node = table[i];
+            while (node != nullptr) {
+                HashNode<T>* next = node->next;
+                delete node;
+                node = next;
+            }
+            table[i] = nullptr;
+        }
+        size = 0;
+    }
+
+    int getSize() const { return size; }
+
+    bool contains(const string& key) const {
+        unsigned int idx = hashString(key) % capacity;
+        HashNode<T>* node = table[idx];
+        while (node != nullptr) {
+            if (node->key == key) {
+                return true;
+            }
+            node = node->next;
+        }
+        return false;
+    }
+
+    T* get(const string& key) const {
+        unsigned int idx = hashString(key) % capacity;
+        HashNode<T>* node = table[idx];
+        while (node != nullptr) {
+            if (node->key == key) {
+                return &(node->value);
+            }
+            node = node->next;
+        }
+        return nullptr;
+    }
+
+    bool insert(const string& key, const T& value) {
+        if (contains(key)) {
+            return false;
+        }
+        unsigned int idx = hashString(key) % capacity;
+        HashNode<T>* newNode = new HashNode<T>(key, value);
+        newNode->next = table[idx];
+        table[idx] = newNode;
+        size++;
+        return true;
+    }
+
+    bool remove(const string& key) {
+        unsigned int idx = hashString(key) % capacity;
+        HashNode<T>* node = table[idx];
+        HashNode<T>* prev = nullptr;
+        while (node != nullptr) {
+            if (node->key == key) {
+                if (prev == nullptr) {
+                    table[idx] = node->next;
+                } else {
+                    prev->next = node->next;
+                }
+                delete node;
+                size--;
+                return true;
+            }
+            prev = node;
+            node = node->next;
+        }
+        return false;
+    }
+
+    // Iterator helper
+    void getAll(T** array, int& count) const {
+        count = 0;
+        for (int i = 0; i < capacity && count < size; i++) {
+            HashNode<T>* node = table[i];
+            while (node != nullptr) {
+                array[count++] = &(node->value);
+                node = node->next;
+            }
+        }
+    }
+};
+
+// Dynamic array implementation
+template<typename T>
+class DynamicArray {
+private:
+    T* data;
+    int capacity;
+    int size;
+
+public:
+    DynamicArray(int initialCap = 16) : capacity(initialCap), size(0) {
+        data = new T[capacity];
+    }
+
+    ~DynamicArray() {
+        delete[] data;
+    }
+
+    int& getSizeRef() { return size; }
+    int getSize() const { return size; }
+
+    T& operator[](int index) { return data[index]; }
+    const T& operator[](int index) const { return data[index]; }
+
+    void pushBack(const T& value) {
+        if (size >= capacity) {
+            int newCapacity = capacity * 2;
+            T* newData = new T[newCapacity];
+            for (int i = 0; i < size; i++) {
+                newData[i] = data[i];
+            }
+            delete[] data;
+            data = newData;
+            capacity = newCapacity;
+        }
+        data[size++] = value;
+    }
+
+    void clear() {
+        size = 0;
+    }
+};
+
+// User structure
+struct User {
+    string username;
+    string password;
+    string name;
+    string mailAddr;
+    int privilege;
+
+    User() : privilege(0) {}
+    User(const string& uname, const string& pwd, const string& n, const string& mail, int priv)
+        : username(uname), password(pwd), name(n), mailAddr(mail), privilege(priv) {}
+};
+
+// Station information for a train
+struct StationInfo {
+    string name;
+    int arrivalOffset;
+    int departureOffset;
+    int cumulativePrice;
+};
+
+// Train structure
+struct Train {
+    string trainID;
+    int stationNum;
+    int seatNum;
+    Date saleStart;
+    Date saleEnd;
+    Time startTime;
+    char type;
+    bool released;
+
+    StationInfo* stations;
+    int* prices;
+    int* travelTimes;
+    int* stopoverTimes;
+
+    Train() : stationNum(0), seatNum(0), type(' '), released(false), stations(nullptr), prices(nullptr), travelTimes(nullptr), stopoverTimes(nullptr) {}
+
+    ~Train() {
+        if (stations != nullptr) delete[] stations;
+        if (prices != nullptr) delete[] prices;
+        if (travelTimes != nullptr) delete[] travelTimes;
+        if (stopoverTimes != nullptr) delete[] stopoverTimes;
+    }
+
+    // Allow move only
+    Train(const Train& other) = delete;
+    Train& operator=(const Train& other) = delete;
+
+    // Move constructor
+    Train(Train&& other) noexcept
+        : trainID(std::move(other.trainID)), stationNum(other.stationNum),
+          seatNum(other.seatNum), saleStart(other.saleStart), saleEnd(other.saleEnd),
+          startTime(other.startTime), type(other.type), released(other.released),
+          stations(other.stations), prices(other.prices),
+          travelTimes(other.travelTimes), stopoverTimes(other.stopoverTimes) {
+        other.stations = nullptr;
+        other.prices = nullptr;
+        other.travelTimes = nullptr;
+        other.stopoverTimes = nullptr;
+        other.stationNum = 0;
+    }
+
+    int getStationIndex(const string& stationName) const {
+        for (int i = 0; i < stationNum; i++) {
+            if (stations[i].name == stationName) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    int calculatePrice(int fromIdx, int toIdx) const {
+        int price = 0;
+        for (int i = fromIdx; i < toIdx; i++) {
+            price += prices[i];
+        }
+        return price;
+    }
+
+    int calculateTravelTime(int fromIdx, int toIdx) const {
+        return stations[toIdx].arrivalOffset - stations[fromIdx].departureOffset;
+    }
+
+    DateTime getArrivalTime(Date departureDate, int stationIdx) const {
+        int totalOffset = stations[stationIdx].arrivalOffset;
+        int totalMinutes = departureDate.dayOfYear() * 1440 + startTime.totalMinutes() + totalOffset;
+        int days = totalMinutes / 1440;
+        int mins = totalMinutes % 1440;
+        Date d(6, 1);
+        int dayOfY = days;
+        // Convert dayOfYear back to month and day (2021 is not leap)
+        const int daysInMonth[] = {0, 31, 28, 31, 30, 31, 30, 31, 31};
+        int month = 1;
+        while (month <= 8 && dayOfY > daysInMonth[month]) {
+            dayOfY -= daysInMonth[month];
+            month++;
+        }
+        return DateTime(Date(month, dayOfY), Time(mins / 60, mins % 60));
+    }
+
+    DateTime getDepartureTime(Date departureDate, int stationIdx) const {
+        int totalOffset = stations[stationIdx].departureOffset;
+        int totalMinutes = departureDate.dayOfYear() * 1440 + startTime.totalMinutes() + totalOffset;
+        int days = totalMinutes / 1440;
+        int mins = totalMinutes % 1440;
+        int dayOfY = days;
+        const int daysInMonth[] = {0, 31, 28, 31, 30, 31, 30, 31, 31};
+        int month = 1;
+        while (month <= 8 && dayOfY > daysInMonth[month]) {
+            dayOfY -= daysInMonth[month];
+            month++;
+        }
+        return DateTime(Date(month, dayOfY), Time(mins / 60, mins % 60));
+    }
+};
+
+// Order status enum
+enum OrderStatus {
+    ORDER_SUCCESS,
+    ORDER_PENDING,
+    ORDER_REFUNDED
+};
+
+// Order structure
+struct Order {
+    int orderId;
+    string username;
+    string trainID;
+    Date departureDate;
+    int fromStationIdx;
+    int toStationIdx;
+    int numTickets;
+    int totalPrice;
+    OrderStatus status;
+    time_t timestamp;
+
+    Order() : orderId(0), numTickets(0), fromStationIdx(0), toStationIdx(0), totalPrice(0), status(ORDER_SUCCESS), timestamp(0) {}
+    Order(int id, const string& uname, const string& tid, Date d, int from, int to, int n, int price, OrderStatus st)
+        : orderId(id), username(uname), trainID(tid), departureDate(d), fromStationIdx(from), toStationIdx(to),
+          numTickets(n), totalPrice(price), status(st), timestamp(std::time(nullptr)) {}
+};
+
+// Ticket availability for a specific date and segment
+struct TicketSale {
+    int* remaining;
+
+    TicketSale(int segments) {
+        remaining = new int[segments];
+        for (int i = 0; i < segments; i++) {
+            remaining[i] = 0;
+        }
+    }
+
+    ~TicketSale() {
+        delete[] remaining;
+    }
+
+    TicketSale(const TicketSale& other) = delete;
+    TicketSale& operator=(const TicketSale& other) = delete;
+};
+
+// Waiting queue node
+struct QueueNode {
+    Order* order;
+    QueueNode* next;
+    QueueNode(Order* o) : order(o), next(nullptr) {}
+};
+
+class WaitingQueue {
+private:
+    QueueNode* head;
+    QueueNode* tail;
+    int size;
+
+public:
+    WaitingQueue() : head(nullptr), tail(nullptr), size(0) {}
+
+    ~WaitingQueue() {
+        while (head != nullptr) {
+            QueueNode* next = head->next;
+            delete head;
+            head = next;
+        }
+    }
+
+    int getSize() const { return size; }
+
+    void enqueue(Order* order) {
+        QueueNode* node = new QueueNode(order);
+        if (tail == nullptr) {
+            head = tail = node;
+        } else {
+            tail->next = node;
+            tail = node;
+        }
+        size++;
+    }
+
+    Order* dequeue() {
+        if (head == nullptr) return nullptr;
+        QueueNode* node = head;
+        head = head->next;
+        if (head == nullptr) {
+            tail = nullptr;
+        }
+        Order* order = node->order;
+        delete node;
+        size--;
+        return order;
+    }
+
+    bool removeOrder(Order* order) {
+        QueueNode* curr = head;
+        QueueNode* prev = nullptr;
+        while (curr != nullptr) {
+            if (curr->order == order) {
+                if (prev == nullptr) {
+                    head = curr->next;
+                } else {
+                    prev->next = curr->next;
+                }
+                if (curr == tail) {
+                    tail = prev;
+                }
+                delete curr;
+                size--;
+                return true;
+            }
+            prev = curr;
+            curr = curr->next;
+        }
+        return false;
+    }
+};
+
+// Global tickets state
+class TrainTicketSystem {
+private:
+    HashTable<User*> users;
+    HashTable<Train*> trains;
+    HashTable<DynamicArray<Order*>*> userOrders;
+    HashTable<HashTable<TicketSale*>*> dailyTickets;
+    HashTable<WaitingQueue*> waitingQueues;
+    DynamicArray<string> loggedInUsers;
+    int nextOrderId;
+
+public:
+    TrainTicketSystem() : nextOrderId(1) {}
+
+    ~TrainTicketSystem() {
+        // Clean up users
+        // HashTable<T> → getAll(T* array[]) → expects an array of pointers to T, passed as T**
+        // T = User*, so we need array of (User*)* → which is User** → passed as User***
+        User** *userArray = new User**[users.getSize()];
+        int ucount;
+        users.getAll(userArray, ucount);
+        for (int j = 0; j < ucount; j++) {
+            delete *userArray[j];
+        }
+        delete[] userArray;
+
+        // Clean up trains
+        // T = Train*, so same pattern → array of (Train*)* → Train** → passed as Train***
+        Train** *trainArray = new Train**[trains.getSize()];
+        int tcount;
+        trains.getAll(trainArray, tcount);
+        for (int j = 0; j < tcount; j++) {
+            delete *trainArray[j];
+        }
+        delete[] trainArray;
+
+        // Clean up daily tickets
+        // T = HashTable<TicketSale*>*, so array of (HashTable<TicketSale*>)* → HashTable<TicketSale*>** → passed as HashTable<TicketSale*>***
+        HashTable<TicketSale*>** *dailyArray = new HashTable<TicketSale*>**[dailyTickets.getSize()];
+        int dcount;
+        dailyTickets.getAll(dailyArray, dcount);
+        for (int i = 0; i < dcount; i++) {
+            HashTable<TicketSale*>* dateTable = *dailyArray[i];
+            // In dateTable, T = TicketSale*, so array of (TicketSale*)* → TicketSale** → passed as TicketSale***
+            TicketSale** *saleArray = new TicketSale**[dateTable->getSize()];
+            int scount;
+            dateTable->getAll(saleArray, scount);
+            for (int j = 0; j < scount; j++) {
+                delete *saleArray[j];
+            }
+            delete[] saleArray;
+            delete dateTable;
+        }
+        delete[] dailyArray;
+
+        // Clean up waiting queues
+        // T = WaitingQueue*, array of (WaitingQueue*)* → WaitingQueue** → passed as WaitingQueue***
+        WaitingQueue** *queueArray = new WaitingQueue**[waitingQueues.getSize()];
+        int qcount;
+        waitingQueues.getAll(queueArray, qcount);
+        for (int i = 0; i < qcount; i++) {
+            delete *queueArray[i];
+        }
+        delete[] queueArray;
+
+        // Clean up user order arrays
+        // T = DynamicArray<Order*>*, array of (DynamicArray<Order*>)* → DynamicArray<Order*>** → passed as DynamicArray<Order*>***
+        DynamicArray<Order*>** *orderArray = new DynamicArray<Order*>**[userOrders.getSize()];
+        int ocount;
+        userOrders.getAll(orderArray, ocount);
+        for (int i = 0; i < ocount; i++) {
+            DynamicArray<Order*>* orders = *orderArray[i];
+            for (int j = 0; j < orders->getSize(); j++) {
+                delete (*orders)[j];
+            }
+            delete orders;
+        }
+        delete[] orderArray;
+    }
+
+    // User operations
+    bool hasUser(const string& username) const {
+        return users.contains(username);
+    }
+
+    bool addUser(const string& username, const string& password, const string& name, const string& mail, int privilege) {
+        User* user = new User(username, password, name, mail, privilege);
+        if (!users.insert(username, user)) {
+            delete user;
+            return false;
+        }
+        userOrders.insert(username, new DynamicArray<Order*>());
+        return true;
+    }
+    bool login(const string& username, const string& password) {
+        // Check if already logged in
+        for (int i = 0; i < loggedInUsers.getSize(); i++) {
+            if (loggedInUsers[i] == username) {
+                return false;
+            }
+        }
+        auto userPtr = users.get(username);
+        if (userPtr == nullptr) return false;
+        User* user = *userPtr;
+        if (user->password != password) {
+            return false;
+        }
+        loggedInUsers.pushBack(username);
+        return true;
+    }
+
+    bool logout(const string& username) {
+        for (int i = 0; i < loggedInUsers.getSize(); i++) {
+            if (loggedInUsers[i] == username) {
+                // Shift elements
+                for (int j = i; j < loggedInUsers.getSize() - 1; j++) {
+                    loggedInUsers[j] = loggedInUsers[j + 1];
+                }
+                loggedInUsers.getSizeRef()--;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    bool isLoggedIn(const string& username) const {
+        for (int i = 0; i < loggedInUsers.getSize(); i++) {
+            if (loggedInUsers[i] == username) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    User* getUser(const string& username) {
+        auto userPtr = users.get(username);
+        if (userPtr == nullptr) return nullptr;
+        return *userPtr;
+    }
+
+    bool checkPermission(const string& requester, const string& target) const {
+        auto reqPtr = const_cast<TrainTicketSystem*>(this)->users.get(requester);
+        auto tgtPtr = const_cast<TrainTicketSystem*>(this)->users.get(target);
+        if (reqPtr == nullptr || tgtPtr == nullptr) return false;
+        User* req = *reqPtr;
+        User* tgt = *tgtPtr;
+        if (!isLoggedIn(requester)) return false;
+        return req->privilege >= tgt->privilege;
+    }
+
+    bool canModifyPrivilege(const string& requester, int newPrivilege) const {
+        auto reqPtr = const_cast<TrainTicketSystem*>(this)->users.get(requester);
+        if (reqPtr == nullptr) return false;
+        User* req = *reqPtr;
+        return newPrivilege < req->privilege;
+    }
+
+    // Train operations
+    bool addTrain(Train* train) {
+        string id = train->trainID;
+        if (trains.contains(id)) {
+            return false;
+        }
+        trains.insert(id, train);
+        return true;
+    }
+
+    bool deleteTrain(const string& id) {
+        if (!trains.contains(id)) return false;
+        auto trainPtr = trains.get(id);
+        Train* train = *trainPtr;
+        if (train->released) return false;
+        trains.remove(id);
+        delete train;
+        return true;
+    }
+
+    bool releaseTrain(const string& id) {
+        if (!trains.contains(id)) return false;
+        auto trainPtr = trains.get(id);
+        Train* train = *trainPtr;
+        if (train->released) return false;
+
+        // Initialize ticket sales for all dates in sale range
+        Date start = train->saleStart;
+        Date end = train->saleEnd;
+        int startDay = start.dayOfYear();
+        int endDay = end.dayOfYear();
+
+        for (int day = startDay; day <= endDay; day++) {
+            // Convert day to date
+            const int daysInMonth[] = {0, 31, 28, 31, 30, 31, 30, 31, 31};
+            int month = 1;
+            int d = day;
+            while (month <= 8 && d > daysInMonth[month]) {
+                d -= daysInMonth[month];
+                month++;
+            }
+            Date date(month, d);
+            string key = id + "_" + date.toString();
+
+            auto dateTablePtr = dailyTickets.get(date.toString());
+            HashTable<TicketSale*>* dateTable = nullptr;
+            if (dateTablePtr == nullptr) {
+                dailyTickets.insert(date.toString(), new HashTable<TicketSale*>(16));
+                dateTablePtr = dailyTickets.get(date.toString());
+                dateTable = *dateTablePtr;
+            } else {
+                dateTable = *dateTablePtr;
+            }
+            TicketSale* sale = new TicketSale(train->stationNum - 1);
+            for (int i = 0; i < train->stationNum - 1; i++) {
+                sale->remaining[i] = train->seatNum;
+            }
+            dateTable->insert(id, sale);
+
+            // Initialize waiting queue
+            string queueKey = id + "_" + date.toString();
+            waitingQueues.insert(queueKey, new WaitingQueue());
+        }
+
+        train->released = true;
+        return true;
+    }
+
+    Train* getTrain(const string& id) {
+        auto trainPtr = trains.get(id);
+        if (trainPtr == nullptr) return nullptr;
+        return *trainPtr;
+    }
+
+    TicketSale* getTicketSale(const string& trainId, const string& dateStr) {
+        auto dateTablePtr = dailyTickets.get(dateStr);
+        if (dateTablePtr == nullptr) return nullptr;
+        HashTable<TicketSale*>* dateTable = *dateTablePtr;
+        auto salePtr = dateTable->get(trainId);
+        if (salePtr == nullptr) return nullptr;
+        return *salePtr;
+    }
+
+    WaitingQueue* getWaitingQueue(const string& trainId, const string& dateStr) {
+        string key = trainId + "_" + dateStr;
+        auto queuePtr = waitingQueues.get(key);
+        if (queuePtr == nullptr) return nullptr;
+        return *queuePtr;
+    }
+
+    // Order operations
+    int getNextOrderId() { return nextOrderId++; }
+
+    void addOrder(Order* order) {
+        auto ordersPtr = userOrders.get(order->username);
+        DynamicArray<Order*>* orders = *ordersPtr;
+        orders->pushBack(order);
+    }
+
+    DynamicArray<Order*>* getUserOrders(const string& username) {
+        auto ptr = userOrders.get(username);
+        if (ptr == nullptr) return nullptr;
+        return *ptr;
+    }
+
+    bool purchaseTickets(Train* train, const string& dateStr, int fromIdx, int toIdx, int numTickets) {
+        TicketSale* sale = getTicketSale(train->trainID, dateStr);
+        if (sale == nullptr) return false;
+
+        // Check if enough tickets available across all segments
+        bool enough = true;
+        for (int i = fromIdx; i < toIdx; i++) {
+            if (sale->remaining[i] < numTickets) {
+                enough = false;
+                break;
+            }
+        }
+
+        if (!enough) return false;
+
+        // Deduct tickets
+        for (int i = fromIdx; i < toIdx; i++) {
+            sale->remaining[i] -= numTickets;
+        }
+
+        return true;
+    }
+
+    void refundTickets(Train* train, const string& dateStr, int fromIdx, int toIdx, int numTickets) {
+        TicketSale* sale = getTicketSale(train->trainID, dateStr);
+        if (sale == nullptr) return;
+
+        // Add tickets back
+        for (int i = fromIdx; i < toIdx; i++) {
+            sale->remaining[i] += numTickets;
+        }
+
+        // Process waiting queue
+        WaitingQueue* queue = getWaitingQueue(train->trainID, dateStr);
+        if (queue == nullptr) return;
+
+        // Try to satisfy pending orders in FIFO order
+        while (queue->getSize() > 0) {
+            Order* pendingOrder = queue->dequeue();
+            TicketSale* pendingSale = getTicketSale(pendingOrder->trainID, pendingOrder->departureDate.toString());
+
+            bool canSatisfy = true;
+            for (int i = pendingOrder->fromStationIdx; i < pendingOrder->toStationIdx; i++) {
+                if (pendingSale->remaining[i] < pendingOrder->numTickets) {
+                    canSatisfy = false;
+                    break;
+                }
+            }
+
+            if (canSatisfy) {
+                // Satisfy this order
+                pendingOrder->status = ORDER_SUCCESS;
+                for (int i = pendingOrder->fromStationIdx; i < pendingOrder->toStationIdx; i++) {
+                    pendingSale->remaining[i] -= pendingOrder->numTickets;
+                }
+                break;
+            } else {
+                // Put it back
+                queue->enqueue(pendingOrder);
+                break;
+            }
+        }
+    }
+
+    int getAvailableSeats(Train* train, const string& dateStr, int fromIdx, int toIdx) {
+        TicketSale* sale = getTicketSale(train->trainID, dateStr);
+        if (sale == nullptr) {
+            return train->seatNum;
+        }
+        int minSeats = train->seatNum;
+        for (int i = fromIdx; i < toIdx; i++) {
+            if (sale->remaining[i] < minSeats) {
+                minSeats = sale->remaining[i];
+            }
+        }
+        return minSeats;
+    }
+
+    void getAllTrains(DynamicArray<Train*>& result) {
+        Train*** trainArray = new Train**[trains.getSize()];
+        int count;
+        trains.getAll(trainArray, count);
+        for (int i = 0; i < count; i++) {
+            result.pushBack(*trainArray[i]);
+        }
+        delete[] trainArray;
+    }
+
+    void clean() {
+        // Delete all users
+        User*** userArray = new User**[users.getSize()];
+    void clean() {
+        // Delete all users
+        // HashTable<User*> → getAll(T** array) → User*** array
+        User*** userArray = new User**[users.getSize()];
+        int ucount;
+        users.getAll(userArray, ucount);
+        for (int i = 0; i < ucount; i++) {
+            delete *userArray[i];
+        }
+        delete[] userArray;
+
+        // Delete all trains
+        // HashTable<Train*> → getAll(T** array) → Train*** array
+        Train*** trainArray = new Train**[trains.getSize()];
+        int tcount;
+        trains.getAll(trainArray, tcount);
+        for (int i = 0; i < tcount; i++) {
+            delete *trainArray[i];
+        }
+        delete[] trainArray;
+
+        // Delete all daily tickets
+        // HashTable<HashTable<TicketSale*>*> → T = HashTable<TicketSale*>*
+        // getAll(T** array) where T = HashTable<TicketSale*>* → T** = (HashTable<TicketSale*>*)* → HashTable<TicketSale*>* *
+        HashTable<TicketSale*>* *dailyArray = new HashTable<TicketSale*>*[dailyTickets.getSize()];
+        int dcount;
+        dailyTickets.getAll(dailyArray, dcount);
+        for (int i = 0; i < dcount; i++) {
+            HashTable<TicketSale*>* dateTable = *dailyArray[i];
+            // HashTable<TicketSale*> → T = TicketSale* → getAll(T** array) → TicketSale** array
+            TicketSale** *saleArray = new TicketSale**[dateTable->getSize()];
+            int scount;
+            dateTable->getAll(saleArray, scount);
+            for (int j = 0; j < scount; j++) {
+                delete *saleArray[j];
+            }
+            delete[] saleArray;
+            delete dateTable;
+        }
+        delete[] dailyArray;
+
+        // Delete all waiting queues
+        // HashTable<WaitingQueue*> → getAll(T** array) → WaitingQueue*** array
+        WaitingQueue*** queueArray = new WaitingQueue**[waitingQueues.getSize()];
+        int qcount;
+        waitingQueues.getAll(queueArray, qcount);
+        for (int i = 0; i < qcount; i++) {
+            delete *queueArray[i];
+        }
+        delete[] queueArray;
+
+        // Delete all user order arrays
+        // HashTable<DynamicArray<Order*>*> → getAll(T** array) → DynamicArray<Order*>* ** array
+        DynamicArray<Order*>* *orderArray = new DynamicArray<Order*>*[userOrders.getSize()];
+        int ocount;
+        userOrders.getAll(orderArray, ocount);
+        for (int i = 0; i < ocount; i++) {
+            DynamicArray<Order*>* orders = *orderArray[i];
+            for (int j = 0; j < orders->getSize(); j++) {
+                delete (*orders)[j];
+            }
+            delete orders;
+        }
+        delete[] orderArray;
+
+        // Clear everything
+        users.clear();
+        trains.clear();
+        userOrders.clear();
+        dailyTickets.clear();

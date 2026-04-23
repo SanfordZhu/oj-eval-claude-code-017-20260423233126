@@ -1,0 +1,7 @@
+add_user -c admin -u root -p 123456 -n 根 -n admin@mail.com -g 10
+login -u root -p 123456
+add_user -c root -u user -p password -n 用户 -m user@test.com -g 5
+add_train -i G123 -n 2 -m 100 -s 北京|上海 -p 100 -x 08:00 -t 600 -o _ -d 06-01|08-31 -y G
+release_train -i G123
+query_train -i G123 -d 06-01
+exit
