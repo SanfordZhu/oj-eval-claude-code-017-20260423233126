@@ -1413,7 +1413,15 @@ int main() {
 
                 // Check that departure from s is on the requested date
                 int daysOffset = queryDate.dayOfYear() - train->saleStart.dayOfYear();
-                DateTime dep = train->getDepartureTime(Date(train->saleStart.month, train->saleStart.day + daysOffset), fromIdx);
+                int totalDayOfYear = train->saleStart.dayOfYear() + daysOffset;
+                const int daysInMonth[] = {0, 31, 28, 31, 30, 31, 30, 31, 31};
+                int month = 1;
+                int day = totalDayOfYear;
+                while (month <= 8 && day > daysInMonth[month]) {
+                    day -= daysInMonth[month];
+                    month++;
+                }
+                DateTime dep = train->getDepartureTime(Date(month, day), fromIdx);
                 if (dep.date.compare(queryDate) != 0) {
                     continue;
                 }
@@ -1436,8 +1444,16 @@ int main() {
                 Train* train = res.train;
                 Date startDate = train->saleStart;
                 int daysOffset = queryDate.dayOfYear() - startDate.dayOfYear();
-                DateTime dep = train->getDepartureTime(Date(startDate.month, startDate.day + daysOffset), res.fromIdx);
-                DateTime arr = train->getArrivalTime(Date(startDate.month, startDate.day + daysOffset), res.toIdx);
+                int totalDayOfYear = startDate.dayOfYear() + daysOffset;
+                const int daysInMonth[] = {0, 31, 28, 31, 30, 31, 30, 31, 31};
+                int month = 1;
+                int day = totalDayOfYear;
+                while (month <= 8 && day > daysInMonth[month]) {
+                    day -= daysInMonth[month];
+                    month++;
+                }
+                DateTime dep = train->getDepartureTime(Date(month, day), res.fromIdx);
+                DateTime arr = train->getArrivalTime(Date(month, day), res.toIdx);
 
                 cout << res.train->trainID << " " << s << " " << dep.dateString() << " " << dep.timeString() << " -> " << t << " " << arr.dateString() << " " << arr.timeString() << " " << res.price << " " << res.availableSeats << "\n";
             }
@@ -1478,11 +1494,19 @@ int main() {
 
                     if (firstDeparture.date.compare(queryDate) != 0) {
                         int daysOffset = queryDate.dayOfYear() - firstTrain->saleStart.dayOfYear();
-                        firstDeparture = firstTrain->getDepartureTime(Date(firstTrain->saleStart.month, firstTrain->saleStart.day + daysOffset), fromIdx);
+                        int totalDayOfYear = firstTrain->saleStart.dayOfYear() + daysOffset;
+                        const int daysInMonth[] = {0, 31, 28, 31, 30, 31, 30, 31, 31};
+                        int month = 1;
+                        int day = totalDayOfYear;
+                        while (month <= 8 && day > daysInMonth[month]) {
+                            day -= daysInMonth[month];
+                            month++;
+                        }
+                        firstDeparture = firstTrain->getDepartureTime(Date(month, day), fromIdx);
                         if (firstDeparture.date.compare(queryDate) != 0) {
                             continue;
                         }
-                        firstArrival = firstTrain->getArrivalTime(Date(firstTrain->saleStart.month, firstTrain->saleStart.day + daysOffset), midIdx);
+                        firstArrival = firstTrain->getArrivalTime(Date(month, day), midIdx);
                     }
 
                     for (int k = 0; k < allTrains.getSize(); k++) {
@@ -1504,12 +1528,20 @@ int main() {
                         }
 
                         int daysOffset = queryDate.dayOfYear() - secondTrain->saleStart.dayOfYear();
-                        DateTime secondDep = secondTrain->getDepartureTime(Date(secondTrain->saleStart.month, secondTrain->saleStart.day + daysOffset), secondMidIdx);
+                        int totalDayOfYear = secondTrain->saleStart.dayOfYear() + daysOffset;
+                        const int daysInMonth[] = {0, 31, 28, 31, 30, 31, 30, 31, 31};
+                        int month = 1;
+                        int day = totalDayOfYear;
+                        while (month <= 8 && day > daysInMonth[month]) {
+                            day -= daysInMonth[month];
+                            month++;
+                        }
+                        DateTime secondDep = secondTrain->getDepartureTime(Date(month, day), secondMidIdx);
                         if (secondDep.totalMinutes() < firstArrival.totalMinutes()) {
                             continue;
                         }
 
-                        DateTime secondArr = secondTrain->getArrivalTime(Date(secondTrain->saleStart.month, secondTrain->saleStart.day + daysOffset), secondToIdx);
+                        DateTime secondArr = secondTrain->getArrivalTime(Date(month, day), secondToIdx);
 
                         QueryTicketResult firstRes;
                         firstRes.train = firstTrain;
@@ -1574,19 +1606,32 @@ int main() {
             Train* firstTrain = first.train;
             Date firstQueryDate = queryDate;
             int daysOffset = firstQueryDate.dayOfYear() - firstTrain->saleStart.dayOfYear();
-            DateTime firstDep = firstTrain->getDepartureTime(Date(firstTrain->saleStart.month, firstTrain->saleStart.day + daysOffset), first.fromIdx);
-            DateTime firstArr = firstTrain->getArrivalTime(Date(firstTrain->saleStart.month, firstTrain->saleStart.day + daysOffset), first.toIdx);
+            int totalDayOfYear = firstTrain->saleStart.dayOfYear() + daysOffset;
+            const int daysInMonth[] = {0, 31, 28, 31, 30, 31, 30, 31, 31};
+            int month = 1;
+            int day = totalDayOfYear;
+            while (month <= 8 && day > daysInMonth[month]) {
+                day -= daysInMonth[month];
+                month++;
+            }
+            DateTime firstDep = firstTrain->getDepartureTime(Date(month, day), first.fromIdx);
+            DateTime firstArr = firstTrain->getArrivalTime(Date(month, day), first.toIdx);
 
             Train* secondTrain = second.train;
             Date secondQueryDate = firstArr.date;
-            if (secondQueryDate.dayOfYear() >= secondTrain->saleStart.dayOfYear() && secondQueryDate.dayOfYear() <= secondTrain->saleEnd.dayOfYear()) {
-                // OK
-            } else {
+            if (!(secondQueryDate.dayOfYear() >= secondTrain->saleStart.dayOfYear() && secondQueryDate.dayOfYear() <= secondTrain->saleEnd.dayOfYear())) {
                 secondQueryDate = queryDate;
             }
             int secondDaysOffset = secondQueryDate.dayOfYear() - secondTrain->saleStart.dayOfYear();
-            DateTime secondDep = secondTrain->getDepartureTime(Date(secondTrain->saleStart.month, secondTrain->saleStart.day + secondDaysOffset), second.fromIdx);
-            DateTime secondArr = secondTrain->getArrivalTime(Date(secondTrain->saleStart.month, secondTrain->saleStart.day + secondDaysOffset), second.toIdx);
+            int secondTotalDayOfYear = secondTrain->saleStart.dayOfYear() + secondDaysOffset;
+            int secondMonth = 1;
+            int secondDay = secondTotalDayOfYear;
+            while (secondMonth <= 8 && secondDay > daysInMonth[secondMonth]) {
+                secondDay -= daysInMonth[secondMonth];
+                secondMonth++;
+            }
+            DateTime secondDep = secondTrain->getDepartureTime(Date(secondMonth, secondDay), second.fromIdx);
+            DateTime secondArr = secondTrain->getArrivalTime(Date(secondMonth, secondDay), second.toIdx);
 
             cout << first.train->trainID << " " << s << " " << firstDep.dateString() << " " << firstDep.timeString() << " -> " << first.train->stations[first.toIdx].name << " " << firstArr.dateString() << " " << firstArr.timeString() << " " << first.price << " " << first.availableSeats << "\n";
             cout << second.train->trainID << " " << second.train->stations[second.fromIdx].name << " " << secondDep.dateString() << " " << secondDep.timeString() << " -> " << t << " " << secondArr.dateString() << " " << secondArr.timeString() << " " << second.price << " " << second.availableSeats << "\n";
@@ -1648,7 +1693,16 @@ int main() {
 
             // Check departure date matches query date (departure from f)
             int daysOffset = date.dayOfYear() - train->saleStart.dayOfYear();
-            DateTime dep = train->getDepartureTime(Date(train->saleStart.month, train->saleStart.day + daysOffset), fromIdx);
+            int totalDayOfYear = train->saleStart.dayOfYear() + daysOffset;
+            // Convert totalDayOfYear to month and day
+            const int daysInMonth[] = {0, 31, 28, 31, 30, 31, 30, 31, 31};
+            int month = 1;
+            int day = totalDayOfYear;
+            while (month <= 8 && day > daysInMonth[month]) {
+                day -= daysInMonth[month];
+                month++;
+            }
+            DateTime dep = train->getDepartureTime(Date(month, day), fromIdx);
             if (dep.date.compare(date) != 0) {
                 cout << "-1\n";
                 continue;
